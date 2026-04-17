@@ -661,7 +661,10 @@
   }
   function bumpZoom(delta) {
     var cur = loadZoom();
-    var next = Math.max(0.75, Math.min(3.5, Math.round((cur + delta) * 100) / 100));
+    // Min 0.3 so users can actually get below the show_diameter=17
+    // clamp that fit_to applies on narrow viewports (needs scale ~70
+    // or lower on a ~400px-wide phone for cells to actually shrink).
+    var next = Math.max(0.3, Math.min(3.5, Math.round((cur + delta) * 100) / 100));
     saveZoom(next);
     applyZoom(next);
   }
