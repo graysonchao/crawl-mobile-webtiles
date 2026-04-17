@@ -213,46 +213,21 @@ body.mwt-in-game #dungeon_block {
   position: relative !important;
 }
 
-/* Wrapper we insert around #dungeon (see ensureDungeonWrapper in
- * mobile.js) so we can give the canvas a scrollable viewport. Native
- * overflow: auto scrolling is hardware-accelerated on iOS without
- * promoting the canvas to its own composite layer (unlike transform),
- * so the WebKit bitmap-caching bug doesn't bite. */
-body.mwt-in-game #mwt-dungeon-wrap {
-  flex: 1 1 0 !important;
-  min-height: 0 !important;
-  min-width: 0 !important;
-  width: 100% !important;
-  overflow: auto !important;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y;
-  overscroll-behavior: contain;
-  background: #000 !important;
-  position: relative;
-  display: block;
-}
-
 body.mwt-in-game #dungeon {
-  /* flex-basis 0 (not auto) so the canvas is sized purely by remaining
-   * flex space, not by its drawing-buffer height. Only applies when
-   * #dungeon is still a direct flex child (pre-wrap); post-wrap the
-   * wrapper above takes the flex slot. */
+  /* flex-basis 0 so the canvas is sized by remaining flex space, not
+   * by its drawing-buffer height. */
   flex: 1 1 0 !important;
   display: block !important;
   width: 100% !important;
   height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
   min-width: 0 !important;
   min-height: 0 !important;
-  /* auto margins on all sides inside an overflow: auto parent centre
-   * the element in the scrollable area, so initial scroll position
-   * shows the middle of the canvas (where the player sprite is). */
-  margin: auto !important;
+  margin: 0 auto !important;
   /* Actual zoom value is applied inline via JS on #dungeon itself
    * because CSS `zoom` is non-standard and engines don't reliably
-   * resolve var() references in non-standard properties - setting it
-   * inline guarantees the zoom buttons take effect. */
+   * resolve var() references in non-standard properties. */
   image-rendering: pixelated !important;
   image-rendering: crisp-edges !important;
   background: #000 !important;

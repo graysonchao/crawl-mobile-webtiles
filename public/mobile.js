@@ -411,18 +411,12 @@
     var now = isInGame();
     document.body.classList.toggle('mwt-in-game', now);
     if (now) {
-      // Wrap #dungeon in our scrollable container if not already. Safe
-      // to call every tick - no-ops once the wrapper is in place.
-      ensureDungeonWrapper();
+      // Re-apply zoom every tick while in-game. Cheap (just an inline
+      // style assignment) and defends against webtiles rewriting the
+      // canvas element's style during layout() recomputations.
+      applyZoomToDungeon(loadZoom());
     }
     if (now && !lastInGame) {
-      // Just entered the game view. Webtiles sized #dungeon based on
-      // whatever container it saw before our .mwt-in-game rules kicked
-      // in (likely the full desktop viewport), which leaves the canvas
-      // sized wrong for mobile. Kick fit_to() again by firing a resize
-      // burst — one immediate, a couple delayed in case the DOM is
-      // still settling. Clear any inline width/height webtiles set so
-      // CSS can own the canvas layout.
       forceDungeonResize();
       setTimeout(forceDungeonResize, 120);
       setTimeout(forceDungeonResize, 500);
@@ -480,13 +474,13 @@
     setInterval(updateInGameClass, 2500);
     window.addEventListener('hashchange', updateInGameClass);
     window.addEventListener('orientationchange', forceDungeonResize);
-    installDungeonResizeWatcher();
+    installDungeonReapplyWatcher();
   }
 
-  // Observe the canvas's width/height attributes so we know when
-  // webtiles has sized it (fit_to runs). Re-centre the scroll so the
-  // player sprite stays in the visible area after any buffer resize.
-  function installDungeonResizeWatcher() {
+  // Observe the canvas's width/height attributes so we re-apply zoom
+  // every time webtiles rebuilds the canvas (fit_to runs), since that
+  // can reset inline styles.
+  function installDungeonReapplyWatcher() {
     var tries = 0;
     (function hook() {
       var d = document.getElementById('dungeon');
@@ -496,9 +490,9 @@
       }
       try {
         var mo = new MutationObserver(function () {
-          requestAnimationFrame(centreDungeonScroll);
+          requestAnimationFrame(function () { applyZoomToDungeon(loadZoom()); });
         });
-        mo.observe(d, { attributes: true, attributeFilter: ['width', 'height'] });
+        mo.observe(d, { attributes: true, attributeFilter: ['width', 'height', 'style'] });
       } catch (_) {}
     })();
   }
@@ -589,100 +583,18 @@
   }
   function applyZoom(v) {
     document.documentElement.style.setProperty('--mwt-zoom', String(v));
-    var d = document.getElementById('dungeon');
-    if (d) {
-      // Direct assignment is the universally-supported path for non-
-      // standard CSS properties like `zoom`. setProperty() is allowed to
-      // silently reject unknown property names in some engines, which
-      // is why the +/- buttons went quiet.
-      d.style.zoom = String(v);
-      // Also set as a belt-and-suspenders with important, which works
-      // in the engines that do support setProperty('zoom', ...).
-      try { d.style.setProperty('zoom', String(v), 'important'); } catch (_) {}
-      centreDungeonScroll();
-    }
+    applyZoomToDungeon(v);
   }
 
-  function centreDungeonScroll() {
-    var wrap = document.getElementById('mwt-dungeon-wrap');
-    var d = document.getElementById('dungeon');
-    if (!wrap || !d) return;
-    var dr = d.getBoundingClientRect();
-    var wr = wrap.getBoundingClientRect();
-    wrap.scrollLeft = Math.max(0, (dr.width  - wr.width)  / 2);
-    wrap.scrollTop  = Math.max(0, (dr.height - wr.height) / 2);
-  }
-
-  function ensureDungeonWrapper() {
+  function applyZoomToDungeon(v) {
     var d = document.getElementById('dungeon');
     if (!d) return;
-    var parent = d.parentNode;
-    if (parent && parent.id === 'mwt-dungeon-wrap') return;
-    var wrap = document.createElement('div');
-    wrap.id = 'mwt-dungeon-wrap';
-    parent.insertBefore(wrap, d);
-    wrap.appendChild(d);
-    installPanInterceptor(wrap);
-    // Apply current zoom to the freshly-parented canvas, then centre.
-    var z = loadZoom();
-    d.style.zoom = String(z);
-    try { d.style.setProperty('zoom', String(z), 'important'); } catch (_) {}
-    requestAnimationFrame(centreDungeonScroll);
-  }
-
-  // Webtiles' mouse_control.js binds touchstart/touchmove on #dungeon for
-  // click-to-move. Native overflow: auto scroll doesn't get a chance
-  // because those listeners fire on the canvas itself. We need to grab
-  // drag gestures in the capture phase on the wrapper (which is an
-  // ancestor of the canvas so our capture listener runs before any
-  // listener installed on the canvas) and drive scroll manually.
-  //
-  // Taps (move < threshold) are not intercepted so click-to-move still
-  // works.
-  function installPanInterceptor(wrap) {
-    var startX = 0, startY = 0, startScrollLeft = 0, startScrollTop = 0;
-    var panning = false;
-    var PAN_THRESHOLD = 8; // px
-
-    wrap.addEventListener('touchstart', function (e) {
-      if (e.touches.length !== 1) return;
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      startScrollLeft = wrap.scrollLeft;
-      startScrollTop = wrap.scrollTop;
-      panning = false;
-    }, { capture: true, passive: true });
-
-    wrap.addEventListener('touchmove', function (e) {
-      if (e.touches.length !== 1) return;
-      var t = e.touches[0];
-      var dx = t.clientX - startX;
-      var dy = t.clientY - startY;
-      if (!panning && (Math.abs(dx) > PAN_THRESHOLD || Math.abs(dy) > PAN_THRESHOLD)) {
-        panning = true;
-      }
-      if (panning) {
-        // Block webtiles' drag handlers and drive scroll ourselves.
-        e.stopPropagation();
-        if (e.cancelable) e.preventDefault();
-        wrap.scrollLeft = startScrollLeft - dx;
-        wrap.scrollTop = startScrollTop - dy;
-      }
-    }, { capture: true, passive: false });
-
-    wrap.addEventListener('touchend', function (e) {
-      if (panning) {
-        // Eat the end event too so webtiles doesn't interpret the drag
-        // release as a tap-to-move.
-        e.stopPropagation();
-        if (e.cancelable) e.preventDefault();
-        panning = false;
-      }
-    }, { capture: true, passive: false });
-
-    wrap.addEventListener('touchcancel', function () {
-      panning = false;
-    }, { capture: true, passive: true });
+    // Direct property assignment is the universally-supported path for
+    // non-standard CSS properties like `zoom`. setProperty() is allowed
+    // to silently reject unknown property names, so belt-and-suspenders
+    // with both.
+    d.style.zoom = String(v);
+    try { d.style.setProperty('zoom', String(v), 'important'); } catch (_) {}
   }
   function bumpZoom(delta) {
     var cur = loadZoom();
@@ -697,7 +609,17 @@
 
   function dumpDomSnapshot() {
     var ids = ['game','dungeon','dungeon_pane','stats','stats_titleline','message_pane','messages_container','messages','minimap_block','minimap','monster_list','action-panel','chat','crt','crt-container','lobby','loader','ui-stack'];
-    var summary = { url: location.href, innerWidth: innerWidth, innerHeight: innerHeight, dpr: devicePixelRatio, inGame: isInGame() };
+    var savedZoom = null;
+    try { savedZoom = localStorage.getItem('mwt-zoom'); } catch (_) {}
+    var dungeon = document.getElementById('dungeon');
+    var zoomInfo = {
+      saved: savedZoom,
+      cssVar: getComputedStyle(document.documentElement).getPropertyValue('--mwt-zoom').trim(),
+      dungeonInlineZoom: dungeon ? (dungeon.style.zoom || null) : null,
+      dungeonComputedZoom: dungeon ? (getComputedStyle(dungeon).zoom || null) : null,
+      dungeonParentId: dungeon && dungeon.parentNode ? (dungeon.parentNode.id || dungeon.parentNode.tagName) : null,
+    };
+    var summary = { url: location.href, innerWidth: innerWidth, innerHeight: innerHeight, dpr: devicePixelRatio, inGame: isInGame(), zoom: zoomInfo };
     ids.forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) { summary[id] = null; return; }
