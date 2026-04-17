@@ -410,6 +410,11 @@
   function updateInGameClass() {
     var now = isInGame();
     document.body.classList.toggle('mwt-in-game', now);
+    if (now) {
+      // Wrap #dungeon in our scrollable container if not already. Safe
+      // to call every tick - no-ops once the wrapper is in place.
+      ensureDungeonWrapper();
+    }
     if (now && !lastInGame) {
       // Just entered the game view. Webtiles sized #dungeon based on
       // whatever container it saw before our .mwt-in-game rules kicked
@@ -475,6 +480,27 @@
     setInterval(updateInGameClass, 2500);
     window.addEventListener('hashchange', updateInGameClass);
     window.addEventListener('orientationchange', forceDungeonResize);
+    installDungeonResizeWatcher();
+  }
+
+  // Observe the canvas's width/height attributes so we know when
+  // webtiles has sized it (fit_to runs). Re-centre the scroll so the
+  // player sprite stays in the visible area after any buffer resize.
+  function installDungeonResizeWatcher() {
+    var tries = 0;
+    (function hook() {
+      var d = document.getElementById('dungeon');
+      if (!d) {
+        if (++tries < 120) return setTimeout(hook, 100);
+        return;
+      }
+      try {
+        var mo = new MutationObserver(function () {
+          requestAnimationFrame(centreDungeonScroll);
+        });
+        mo.observe(d, { attributes: true, attributeFilter: ['width', 'height'] });
+      } catch (_) {}
+    })();
   }
 
   // --------------------------------------------------------------------------
@@ -563,6 +589,43 @@
   }
   function applyZoom(v) {
     document.documentElement.style.setProperty('--mwt-zoom', String(v));
+    // CSS `zoom` is non-standard so engines often don't resolve var()
+    // inside it. Set it inline on the canvas so the +/- buttons
+    // actually take effect.
+    var d = document.getElementById('dungeon');
+    if (d) {
+      d.style.setProperty('zoom', String(v), 'important');
+      // If the canvas just got wider/taller than its scroll wrapper,
+      // re-centre so the player sprite stays in view.
+      centreDungeonScroll();
+    }
+  }
+
+  function centreDungeonScroll() {
+    var wrap = document.getElementById('mwt-dungeon-wrap');
+    var d = document.getElementById('dungeon');
+    if (!wrap || !d) return;
+    // Read post-zoom dimensions via the rendered bounding box.
+    var dr = d.getBoundingClientRect();
+    var wr = wrap.getBoundingClientRect();
+    wrap.scrollLeft = Math.max(0, (dr.width  - wr.width)  / 2);
+    wrap.scrollTop  = Math.max(0, (dr.height - wr.height) / 2);
+  }
+
+  function ensureDungeonWrapper() {
+    var d = document.getElementById('dungeon');
+    if (!d) return;
+    var parent = d.parentNode;
+    if (parent && parent.id === 'mwt-dungeon-wrap') return;
+    var wrap = document.createElement('div');
+    wrap.id = 'mwt-dungeon-wrap';
+    parent.insertBefore(wrap, d);
+    wrap.appendChild(d);
+    // Apply current zoom to freshly-parented canvas, then centre.
+    var z = loadZoom();
+    d.style.setProperty('zoom', String(z), 'important');
+    // After the next layout pass (so boundingClientRect is valid).
+    requestAnimationFrame(centreDungeonScroll);
   }
   function bumpZoom(delta) {
     var cur = loadZoom();
