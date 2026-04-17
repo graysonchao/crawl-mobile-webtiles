@@ -225,14 +225,16 @@ body.mwt-in-game #dungeon {
   min-width: 0 !important;
   min-height: 0 !important;
   margin: 0 auto !important;
-  transform: scale(var(--mwt-zoom)) translateZ(0) !important;
-  transform-origin: 50% 50% !important;
-  /* will-change puts #dungeon on its own compositor layer so each canvas
-   * update (FoV reveal, player move, cell change) repaints only the
-   * canvas bitmap, not the whole flex column. Also defeats some iOS
-   * Safari quirks where transformed canvases coalesce frames. */
-  will-change: transform, contents !important;
-  backface-visibility: hidden !important;
+  /* Zoom via CSS `zoom` instead of `transform: scale` because WebKit
+   * implements zoom as a layout reflow, not a composite transform. A
+   * scaled canvas gets its own compositor layer and WebKit caches the
+   * layer bitmap, so per-cell canvas pixel updates (player sprite, FoV
+   * reveals) don't re-read until something else forces the layer to
+   * redraw - causing the "bump attack updates, vi-move sprite lags a
+   * turn behind" bug on iOS WebKit. `zoom` sidesteps this entirely.
+   * Non-standard, but well-supported in Chrome / Safari / WebKit iOS
+   * (which is every browser on iOS). */
+  zoom: var(--mwt-zoom) !important;
   image-rendering: pixelated !important;
   image-rendering: crisp-edges !important;
   background: #000 !important;
