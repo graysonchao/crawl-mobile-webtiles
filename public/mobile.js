@@ -597,17 +597,34 @@
       so('tile_viewport_scale', scale);
       so('tile_map_scale', scale);
     } catch (_) {}
-    // Kick layout() so fit_to re-runs with the new scale. fit_to
-    // internally calls set_size which re-inits the canvas and clears
-    // the buffer, so afterwards we need to explicitly repaint all
-    // visible cells from map_knowledge, otherwise the screen stays
-    // black until the next server-pushed cell update.
-    try { window.dispatchEvent(new Event('resize')); } catch (_) {}
-    // Two-frame delay so webtiles' resize handler + fit_to have
-    // finished before we invalidate+display.
+    // Skip the dispatchEvent('resize') -> layout() path: layout() has
+    // a layout_params_differ() early-return that fires whenever
+    // window.innerWidth/innerHeight haven't changed, which means every
+    // press after the first short-circuits without calling fit_to.
+    // Instead, grab dungeon_renderer directly and call fit_to with the
+    // same args layout() would have computed.
     requestAnimationFrame(function () {
+      refitDungeon();
       requestAnimationFrame(redrawAllCells);
     });
+  }
+
+  function refitDungeon() {
+    var dr = findDungeonRenderer();
+    if (!dr || typeof dr.fit_to !== 'function') return;
+    // Match webtiles' layout():
+    //   remaining_width  = innerWidth  - stat_width
+    //   remaining_height = innerHeight - msg_height
+    // We already patched jQuery's outerWidth/outerHeight on #stats /
+    // #messages to return mobile-correct values (stat_width = 0,
+    // msg_height = kbd+stats+msg), so we mirror that math here.
+    var kbdH = cssPx('--mwt-kbd-h', 280);
+    var msgH = cssPx('--mwt-msg-h', 78);
+    var statsEl = document.getElementById('stats');
+    var statsH = statsEl ? statsEl.getBoundingClientRect().height : 90;
+    var w = window.innerWidth;
+    var h = window.innerHeight - (kbdH + statsH + msgH);
+    try { dr.fit_to(w, h, 17); } catch (_) {}
   }
 
   // Pull display.invalidate(true) + display.display() via RequireJS so
@@ -633,17 +650,34 @@
       'static/display',
     ]);
     if (_displayModule) return _displayModule;
+    _displayModule = scanDefined(function (m) {
+      return m && typeof m.invalidate === 'function' && typeof m.display === 'function';
+    });
+    return _displayModule;
+  }
+
+  var _dungeonRenderer = null;
+  function findDungeonRenderer() {
+    if (_dungeonRenderer) return _dungeonRenderer;
+    _dungeonRenderer = tryRequire([
+      'dungeon_renderer', './dungeon_renderer',
+      'game_data/static/dungeon_renderer',
+    ]);
+    if (_dungeonRenderer) return _dungeonRenderer;
+    _dungeonRenderer = scanDefined(function (m) {
+      return m && typeof m.fit_to === 'function' && typeof m.set_view_center === 'function';
+    });
+    return _dungeonRenderer;
+  }
+
+  function scanDefined(predicate) {
     try {
       var req = window.require || window.requirejs;
       var defined = req && req.s && req.s.contexts && req.s.contexts._
                     && req.s.contexts._.defined;
       if (!defined) return null;
       for (var name in defined) {
-        var m = defined[name];
-        if (m && typeof m.invalidate === 'function' && typeof m.display === 'function') {
-          _displayModule = m;
-          return m;
-        }
+        if (predicate(defined[name])) return defined[name];
       }
     } catch (_) {}
     return null;
@@ -686,6 +720,7 @@
       dungeonParentId: dungeon && dungeon.parentNode ? (dungeon.parentNode.id || dungeon.parentNode.tagName) : null,
       hasSetOption: typeof window.set_option === 'function',
       displayModule: !!findDisplayModule(),
+      dungeonRendererModule: !!findDungeonRenderer(),
       requireDefinedCount: (function () {
         try {
           var req = window.require || window.requirejs;
