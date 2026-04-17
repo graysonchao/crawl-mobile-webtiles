@@ -376,6 +376,7 @@
     setMode('game');
     renderMods();
     installGameStateWatcher();
+    patchWebtilesLayoutMetrics();
 
     // Nudge webtiles to re-layout now that we've changed the available
     // space (it listens for window resize and calls fit_to).
@@ -453,6 +454,78 @@
     setInterval(updateInGameClass, 750);
     window.addEventListener('hashchange', updateInGameClass);
     window.addEventListener('orientationchange', forceDungeonResize);
+  }
+
+  // --------------------------------------------------------------------------
+  // Patch jQuery measurements that webtiles' layout() function uses so
+  // fit_to() gets mobile-correct values.
+  //
+  // Desktop layout assumes:
+  //   remaining_width  = window_width  - $("#stats").outerWidth()
+  //   remaining_height = window_height - $("#messages").outerHeight()
+  //   dungeon_renderer.fit_to(remaining_width, remaining_height, 17)
+  //
+  // Our mobile CSS stacks #stats vertically as a 100vw strip at the top,
+  // and #message_pane as a fixed 78px band above the on-screen keyboard.
+  // So the desktop math gives remaining_width = 0 and remaining_height =
+  // way too tall, and fit_to produces a broken 300x1782 canvas buffer.
+  //
+  // Intercept the two measurement calls on #stats and #messages so they
+  // report the values that make `window - X = our actual dungeon area`.
+  // --------------------------------------------------------------------------
+
+  function patchWebtilesLayoutMetrics() {
+    var attempts = 0;
+    (function tryPatch() {
+      var jq = window.jQuery || window.$;
+      if (!jq || !jq.fn) {
+        if (++attempts < 200) return setTimeout(tryPatch, 75);
+        return;
+      }
+      if (jq.fn.__mwtPatched) return;
+      jq.fn.__mwtPatched = true;
+
+      var origOW = jq.fn.outerWidth;
+      var origOH = jq.fn.outerHeight;
+
+      jq.fn.outerWidth = function () {
+        if (
+          document.body.classList.contains('mwt-in-game')
+          && this.length === 1
+          && this[0]
+          && this[0].id === 'stats'
+        ) {
+          // We want remaining_width = window.innerWidth, so stats appears
+          // to have zero width in the horizontal layout math.
+          return 0;
+        }
+        return origOW.apply(this, arguments);
+      };
+
+      jq.fn.outerHeight = function () {
+        if (
+          document.body.classList.contains('mwt-in-game')
+          && this.length === 1
+          && this[0]
+          && this[0].id === 'messages'
+        ) {
+          // We want remaining_height = innerHeight - msg = actual dungeon
+          // area. Dungeon area = innerHeight - keyboard - stats - message.
+          // So msg (as reported to layout()) should be keyboard + stats + msg.
+          var kbdH = cssPx('--mwt-kbd-h', 280);
+          var msgH = cssPx('--mwt-msg-h', 78);
+          var statsEl = document.getElementById('stats');
+          var statsH = statsEl ? statsEl.getBoundingClientRect().height : 90;
+          return Math.max(80, Math.round(kbdH + statsH + msgH));
+        }
+        return origOH.apply(this, arguments);
+      };
+    })();
+  }
+
+  function cssPx(varName, fallback) {
+    var v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(varName));
+    return isFinite(v) && v > 0 ? v : fallback;
   }
 
   // --------------------------------------------------------------------------
