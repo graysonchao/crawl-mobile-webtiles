@@ -53,23 +53,34 @@ body.mwt-kbd-visible #chat {
 }
 
 /* ==========================================================================
- * Phone layout for the in-game view.
+ * Phone layout.
  *
- * Webtiles was designed for desktop and arranges #stats inline-block next
- * to the dungeon canvas; on a phone the browser stacks them but the stats
- * panel then eats half the screen while #dungeon renders a huge mostly-
- * empty canvas because its `fit_to(w,h,min_diameter)` sees plenty of space.
+ *   body.mwt-mobile     — always on while our overlay is loaded. Safe tweaks
+ *                          that work on every view (lobby, login, game, CRT
+ *                          menus, popups): compact input sizing, menu size
+ *                          caps, hiding chat / monster list etc. that are
+ *                          never useful on a phone.
  *
- * We rework the layout into a strict vertical stack:
+ *   body.mwt-in-game    — toggled on only when the in-game view is actually
+ *                          live (i.e. #dungeon or #stats exist in the DOM).
+ *                          The aggressive layout overrides (fixed-position
+ *                          #game, scaled #dungeon, fixed #message_pane) live
+ *                          here so they don't overlay the lobby.
+ *
+ * Desktop webtiles lays out #stats inline-block next to the dungeon canvas;
+ * on a phone the browser stacks them but #stats then eats half the screen
+ * while #dungeon renders a huge mostly-empty canvas because its
+ * fit_to(w,h,min_diameter) sees plenty of space.
+ *
+ * We rework the in-game layout into a strict vertical stack:
  *
  *    [ #stats — compact strip, 2-column ]
  *    [ #dungeon — fills remaining space, CSS-zoomed ]
  *    [ #message_pane — fixed above the keyboard ]
  *    [ #mwt-kbd — our overlay ]
  *
- * and hide everything that isn't critical on a phone (minimap, monster
- * list, chat, action panel, banner/footer). Keybound menus and inventory
- * are still reachable via the keyboard, which is the point.
+ * Keybound menus and inventory are still reachable via the keyboard, which
+ * is the point.
  * ========================================================================= */
 
 :root {
@@ -81,11 +92,12 @@ body.mwt-mobile {
   margin: 0 !important;
   padding: 0 !important;
   padding-bottom: var(--mwt-kbd-h) !important;
-  overflow: hidden !important;
   background: #000 !important;
 }
 
-/* Hide the non-essential panels wholesale on phone. Re-expose via keys. */
+/* Hide panels that are never useful on a phone regardless of view. Minimap,
+ * monster list, action panel etc. aren't rendered on the lobby either so
+ * hiding them here doesn't affect the lobby. */
 body.mwt-mobile #minimap_block,
 body.mwt-mobile #minimap,
 body.mwt-mobile #minimap_overlay,
@@ -95,14 +107,29 @@ body.mwt-mobile #chat_body,
 body.mwt-mobile #chat_hidden,
 body.mwt-mobile #action-panel,
 body.mwt-mobile #action-panel-placeholder,
-body.mwt-mobile #action-panel-settings,
-body.mwt-mobile #banner,
-body.mwt-mobile #footer {
+body.mwt-mobile #action-panel-settings {
   display: none !important;
 }
 
-/* Root game wrapper fills the viewport minus the keyboard. */
-body.mwt-mobile #game {
+/* Banner/footer: useful on the lobby (server name / links), hidden in-game
+ * because they just waste rows. Gated on mwt-in-game below. */
+
+/* ------------------- In-game-only layout overrides ----------------------- */
+
+/* Root game wrapper fills the viewport minus the keyboard — but ONLY when
+ * the game view is actually live; otherwise webtiles' own display:none on
+ * #game is what we want, and our aggressive rules would paint a black box
+ * over the lobby. */
+body.mwt-in-game {
+  overflow: hidden !important;
+}
+
+body.mwt-in-game #banner,
+body.mwt-in-game #footer {
+  display: none !important;
+}
+
+body.mwt-in-game #game {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
@@ -112,15 +139,16 @@ body.mwt-mobile #game {
   height: calc(100vh - var(--mwt-kbd-h)) !important;
   max-height: none !important;
   margin: 0 !important;
-  padding: 0 !important;
+  padding: 0 0 var(--mwt-msg-h) 0 !important;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
   background: #000 !important;
+  box-sizing: border-box !important;
 }
 
 /* Stats strip at the top. Compact font, two columns so lines pack tighter. */
-body.mwt-mobile #stats {
+body.mwt-in-game #stats {
   flex: 0 0 auto !important;
   display: block !important;
   position: static !important;
@@ -141,35 +169,32 @@ body.mwt-mobile #stats {
   box-sizing: border-box !important;
 }
 
-body.mwt-mobile #stats > div,
-body.mwt-mobile #stats > span {
+body.mwt-in-game #stats > div,
+body.mwt-in-game #stats > span {
   break-inside: avoid !important;
   display: block !important;
 }
 
-/* Stats elements with images (weapon icons, species portrait) stay inline. */
-body.mwt-mobile #stats img,
-body.mwt-mobile #stats canvas {
+body.mwt-in-game #stats img,
+body.mwt-in-game #stats canvas {
   height: 14px !important;
   width: auto !important;
   vertical-align: middle !important;
 }
 
-/* The HP/MP bars inside #stats: keep them on their line, don't let them
- * stretch across the whole column. */
-body.mwt-mobile #stats .hp_bar,
-body.mwt-mobile #stats .mp_bar,
-body.mwt-mobile #stats [class*="bar"] {
+body.mwt-in-game #stats .hp_bar,
+body.mwt-in-game #stats .mp_bar,
+body.mwt-in-game #stats [class*="bar"] {
   display: inline-block !important;
   vertical-align: middle !important;
   height: 8px !important;
   width: 60px !important;
 }
 
-/* Dungeon area: the renderer drew a canvas inside #dungeon. We centre it in
- * whatever flex space remains and CSS-scale it up so the tiles are readable. */
-body.mwt-mobile #dungeon_pane,
-body.mwt-mobile #dungeon_block {
+/* Dungeon area: centre the canvas in whatever flex space remains and
+ * CSS-scale it up so the tiles are readable on a high-dpi phone. */
+body.mwt-in-game #dungeon_pane,
+body.mwt-in-game #dungeon_block {
   flex: 1 1 auto !important;
   display: flex !important;
   align-items: center !important;
@@ -181,7 +206,7 @@ body.mwt-mobile #dungeon_block {
   position: relative !important;
 }
 
-body.mwt-mobile #dungeon {
+body.mwt-in-game #dungeon {
   display: block !important;
   max-width: none !important;
   max-height: none !important;
@@ -193,9 +218,8 @@ body.mwt-mobile #dungeon {
   background: #000 !important;
 }
 
-/* Message pane: float it just above the keyboard, fixed so it's always
- * in the same spot regardless of how the parents resize. */
-body.mwt-mobile #message_pane {
+/* Message pane: float it just above the keyboard. */
+body.mwt-in-game #message_pane {
   position: fixed !important;
   left: 0 !important;
   right: 0 !important;
@@ -217,18 +241,12 @@ body.mwt-mobile #message_pane {
   box-sizing: border-box !important;
 }
 
-body.mwt-mobile #messages_container,
-body.mwt-mobile #messages {
+body.mwt-in-game #messages_container,
+body.mwt-in-game #messages {
   width: 100% !important;
   max-width: 100% !important;
   font-size: 11px !important;
   line-height: 1.25 !important;
-}
-
-/* When #message_pane is fixed above the keyboard we still need to reserve
- * that vertical space inside #game so the dungeon doesn't hide under it. */
-body.mwt-mobile #game {
-  padding-bottom: var(--mwt-msg-h) !important;
 }
 
 /* Console / CRT view (used for some menus, game selection text screens). */

@@ -375,12 +375,51 @@
     applyZoom(loadZoom());
     setMode('game');
     renderMods();
+    installGameStateWatcher();
 
     // Nudge webtiles to re-layout now that we've changed the available
     // space (it listens for window resize and calls fit_to).
     setTimeout(function () {
       try { window.dispatchEvent(new Event('resize')); } catch (_) {}
     }, 50);
+  }
+
+  // --------------------------------------------------------------------------
+  // mwt-in-game toggle
+  //
+  // Our aggressive layout rules (fixed #game, scaled #dungeon, fixed
+  // #message_pane, hidden #banner/#footer) must only apply when the
+  // in-game view is live. Otherwise they paint a black #game box over
+  // the lobby. We detect "in-game" by the presence of #dungeon or
+  // #stats, plus a visible #game wrapper, and watch for DOM changes.
+  // --------------------------------------------------------------------------
+
+  function isInGame() {
+    var game = document.getElementById('game');
+    if (!game) return false;
+    if (game.offsetParent === null && getComputedStyle(game).position !== 'fixed') return false;
+    return !!(document.getElementById('dungeon') || document.getElementById('stats'));
+  }
+
+  function updateInGameClass() {
+    document.body.classList.toggle('mwt-in-game', isInGame());
+  }
+
+  function installGameStateWatcher() {
+    updateInGameClass();
+    try {
+      var mo = new MutationObserver(function () { updateInGameClass(); });
+      mo.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+      });
+    } catch (_) { /* old browsers: rely on polling below */ }
+    // Polling fallback — cheap, covers cases the observer misses (e.g. when
+    // webtiles toggles display via class swaps we don't see).
+    setInterval(updateInGameClass, 750);
+    window.addEventListener('hashchange', updateInGameClass);
   }
 
   // --------------------------------------------------------------------------
