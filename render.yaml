@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: crawl-mobile-webtiles
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DCSS_UPSTREAM
+        value: https://crawl.project357.org
+        sync: false
+      - key: NODE_VERSION
+        value: "20"

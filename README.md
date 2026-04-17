@@ -1,5 +1,7 @@
 # crawl-mobile-webtiles
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/graysonchao/crawl-mobile-webtiles)
+
 A tiny Node.js proxy that makes [Dungeon Crawl Stone Soup](https://crawl.develz.org/)
 WebTiles playable on a phone.
 
@@ -17,6 +19,23 @@ overlay just dispatches synthesized `KeyboardEvent`s — no custom WebSocket
 protocol work is required.
 
 ## Quick start
+
+### Hosted on Render (phone-friendly)
+
+Tap the **Deploy to Render** button above. Render will:
+
+1. Ask you to sign in with GitHub and authorize access to this repo.
+2. Read `render.yaml`, create a free web service, and start deploying.
+3. When the deploy finishes you'll get a `https://<name>.onrender.com` URL —
+   open that on your phone and log in with your WebTiles account.
+
+Free tier gotcha: the service sleeps after ~15 minutes of inactivity, so the
+first request after a break takes ~30-60 s while it wakes up. Upgrade to the
+$7/mo Starter plan if you want it always-on. You can change `DCSS_UPSTREAM`
+in Render's dashboard under the service's *Environment* tab if you prefer a
+different public server (list below).
+
+### Local
 
 ```sh
 npm install
