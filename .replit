@@ -1,29 +1,5 @@
 run = "npm start"
-entrypoint = "server.js"
 modules = ["nodejs-20"]
-hidden = [".config", "package-lock.json"]
-
-[nix]
-channel = "stable-24_05"
 
 [env]
 DCSS_UPSTREAM = "https://crawl.project357.org"
-
-[packager]
-language = "nodejs"
-  [packager.features]
-  enabledForHosting = false
-  packageSearch = true
-  guessImports = true
-
-[unitTest]
-language = "nodejs"
-
-[deployment]
-run = ["npm", "start"]
-deploymentTarget = "cloudrun"
-ignorePorts = false
-
-[[ports]]
-localPort = 3000
-externalPort = 80
