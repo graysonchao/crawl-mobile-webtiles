@@ -1,6 +1,6 @@
 # crawl-mobile-webtiles
 
-[**Remix on Glitch**](https://glitch.com/edit/#!/import/github/graysonchao/crawl-mobile-webtiles) · [Deploy to Render](https://render.com/deploy?repo=https://github.com/graysonchao/crawl-mobile-webtiles)
+[![Run on Replit](https://replit.com/badge/github/graysonchao/crawl-mobile-webtiles)](https://replit.com/github/graysonchao/crawl-mobile-webtiles) · [Deploy to Render](https://render.com/deploy?repo=https://github.com/graysonchao/crawl-mobile-webtiles)
 
 A tiny Node.js proxy that makes [Dungeon Crawl Stone Soup](https://crawl.develz.org/)
 WebTiles playable on a phone.
@@ -20,23 +20,25 @@ protocol work is required.
 
 ## Quick start
 
-### Hosted on Glitch (phone-friendly, no GitHub auth)
+### Hosted on Replit (phone-friendly, no GitHub auth)
 
-Tap the **Remix on Glitch** button above. Glitch fetches this repo as a
-public tarball — no GitHub OAuth needed.
+Tap the **Run on Replit** button above. Replit imports public GitHub repos
+by URL — it fetches the repo as a public tarball and doesn't ask for any
+GitHub OAuth grant.
 
-1. If Glitch asks you to sign in, any login method is fine (Google, email, etc).
-2. Glitch picks up `glitch.json` / `package.json`, runs `npm install`, then
-   `npm start`. Logs are in the *Tools → Logs* pane.
-3. Tap *Share → Live site*. You get a `https://<your-project>.glitch.me` URL
-   — open that on your phone and log in with your WebTiles account.
-4. To point at a different upstream, edit the project's `.env` in the Glitch
-   editor and add `DCSS_UPSTREAM=https://your-server` (Glitch auto-loads
-   `.env` into `process.env`). Our server already reads that var.
+1. Sign in to Replit with any provider (Google, email, etc.) if you aren't
+   already.
+2. Replit reads `.replit`, provisions Node 20, and runs `npm install` then
+   `npm start`. Logs are in the *Console* pane.
+3. Once the server prints `mobile-webtiles proxy listening on …`, tap the
+   *Webview* pane (or its pop-out button) to get a `https://<slug>.replit.dev`
+   URL. Open that on your phone and log in with your WebTiles account.
+4. To point at a different upstream, open the *Secrets* (lock icon) panel
+   and edit `DCSS_UPSTREAM`. Our server re-reads it on restart.
 
-Free-tier gotcha: the project sleeps after ~5 minutes of idle; first request
-wakes it back up in a few seconds. Glitch gives you ~1000 hours/month on the
-free plan.
+Free-tier gotcha: the Repl goes to sleep after ~5 minutes of inactivity and
+takes 10-30 s to wake on the next request. For always-on you need a paid
+Replit *Deployment* (or use Render / Fly).
 
 ### Hosted on Render
 
