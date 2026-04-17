@@ -619,7 +619,29 @@
       dungeonComputedZoom: dungeon ? (getComputedStyle(dungeon).zoom || null) : null,
       dungeonParentId: dungeon && dungeon.parentNode ? (dungeon.parentNode.id || dungeon.parentNode.tagName) : null,
     };
-    var summary = { url: location.href, innerWidth: innerWidth, innerHeight: innerHeight, dpr: devicePixelRatio, inGame: isInGame(), zoom: zoomInfo };
+    // Walk #game's direct children so we can see who else is competing
+    // for flex space. Lists the DOM order with id/tag/display/size/flex.
+    var gameKids = [];
+    var g = document.getElementById('game');
+    if (g) {
+      for (var i = 0; i < g.children.length; i++) {
+        var k = g.children[i];
+        var cs = getComputedStyle(k);
+        var r = k.getBoundingClientRect();
+        gameKids.push({
+          i: i,
+          id: k.id || null,
+          tag: k.tagName,
+          cls: k.className || null,
+          display: cs.display,
+          flex: cs.flex,
+          position: cs.position,
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+        });
+      }
+    }
+    var summary = { url: location.href, innerWidth: innerWidth, innerHeight: innerHeight, dpr: devicePixelRatio, inGame: isInGame(), zoom: zoomInfo, gameKids: gameKids };
     ids.forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) { summary[id] = null; return; }
