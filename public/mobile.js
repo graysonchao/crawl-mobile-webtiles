@@ -325,6 +325,12 @@
     zoomOut.addEventListener('click', function () { bumpZoom(-0.15); });
     rightGroup.appendChild(zoomOut);
 
+    var zoomLabel = document.createElement('span');
+    zoomLabel.className = 'mwt-zoom-label';
+    zoomLabel.id = 'mwt-zoom-label';
+    zoomLabel.textContent = formatZoom(loadZoom());
+    rightGroup.appendChild(zoomLabel);
+
     var zoomIn = document.createElement('button');
     zoomIn.type = 'button';
     zoomIn.textContent = '+';
@@ -584,6 +590,12 @@
   function applyZoom(v) {
     document.documentElement.style.setProperty('--mwt-zoom', String(v));
     applyZoomToDungeon(v);
+    var lbl = document.getElementById('mwt-zoom-label');
+    if (lbl) lbl.textContent = formatZoom(v);
+  }
+
+  function formatZoom(v) {
+    return v.toFixed(2).replace(/\.?0+$/, '') + '×';
   }
 
   function applyZoomToDungeon(v) {

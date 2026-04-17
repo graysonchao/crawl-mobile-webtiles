@@ -415,6 +415,19 @@ body.mwt-mobile #login input[type="password"] {
   padding: 0 10px;
 }
 
+#mwt-kbd .mwt-zoom-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 0 2px;
+  font-size: 11px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--mwt-fg);
+  opacity: 0.75;
+  user-select: none;
+}
+
 #mwt-kbd .mwt-panel {
   display: none;
   flex-direction: column;
