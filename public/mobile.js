@@ -401,8 +401,32 @@
     return !!(document.getElementById('dungeon') || document.getElementById('stats'));
   }
 
+  var lastInGame = false;
   function updateInGameClass() {
-    document.body.classList.toggle('mwt-in-game', isInGame());
+    var now = isInGame();
+    document.body.classList.toggle('mwt-in-game', now);
+    if (now && !lastInGame) {
+      // Just entered the game view. Webtiles sized #dungeon based on
+      // whatever container it saw before our .mwt-in-game rules kicked
+      // in (likely the full desktop viewport), which leaves the canvas
+      // sized wrong for mobile. Kick fit_to() again by firing a resize
+      // burst — one immediate, a couple delayed in case the DOM is
+      // still settling. Clear any inline width/height webtiles set so
+      // CSS can own the canvas layout.
+      forceDungeonResize();
+      setTimeout(forceDungeonResize, 120);
+      setTimeout(forceDungeonResize, 500);
+    }
+    lastInGame = now;
+  }
+
+  function forceDungeonResize() {
+    var c = document.getElementById('dungeon');
+    if (c) {
+      c.style.removeProperty('width');
+      c.style.removeProperty('height');
+    }
+    try { window.dispatchEvent(new Event('resize')); } catch (_) {}
   }
 
   function installGameStateWatcher() {
@@ -420,6 +444,7 @@
     // webtiles toggles display via class swaps we don't see).
     setInterval(updateInGameClass, 750);
     window.addEventListener('hashchange', updateInGameClass);
+    window.addEventListener('orientationchange', forceDungeonResize);
   }
 
   // --------------------------------------------------------------------------

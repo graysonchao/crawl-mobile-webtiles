@@ -191,8 +191,14 @@ body.mwt-in-game #stats [class*="bar"] {
   width: 60px !important;
 }
 
-/* Dungeon area: centre the canvas in whatever flex space remains and
- * CSS-scale it up so the tiles are readable on a high-dpi phone. */
+/* Dungeon area: on most webtiles builds #dungeon sits directly inside
+ * #game (there is no #dungeon_pane wrapper), so we treat #dungeon itself
+ * as the flex-filler. Webtiles sets the canvas's inline style.width and
+ * style.height based on fit_to() against whatever container size it saw
+ * at game-start time, which was the *desktop* layout because our
+ * .mwt-in-game class isn't applied until a beat later. We override those
+ * inline styles, then dispatch a synthetic resize from JS so fit_to()
+ * runs again against our mobile container. */
 body.mwt-in-game #dungeon_pane,
 body.mwt-in-game #dungeon_block {
   flex: 1 1 auto !important;
@@ -202,15 +208,22 @@ body.mwt-in-game #dungeon_block {
   overflow: hidden !important;
   width: 100% !important;
   min-height: 0 !important;
+  min-width: 0 !important;
   background: #000 !important;
   position: relative !important;
 }
 
 body.mwt-in-game #dungeon {
+  flex: 1 1 auto !important;
   display: block !important;
-  max-width: none !important;
-  max-height: none !important;
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
   margin: 0 auto !important;
+  object-fit: contain !important;
   transform: scale(var(--mwt-zoom)) !important;
   transform-origin: 50% 50% !important;
   image-rendering: pixelated !important;
