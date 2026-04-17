@@ -495,14 +495,12 @@
         return;
       }
       try {
+        // Only watch width/height (buffer) - no need to watch style
+        // since we don't touch canvas inline size any more.
         var mo = new MutationObserver(function () {
-          // Skip the mutation that our own applyZoomToDungeon just made,
-          // otherwise we'd loop: we write width/height -> observer fires
-          // -> applyZoomToDungeon writes width/height -> ...
-          if (_applyingZoom) return;
           requestAnimationFrame(function () { applyZoomToDungeon(loadZoom()); });
         });
-        mo.observe(d, { attributes: true, attributeFilter: ['width', 'height', 'style'] });
+        mo.observe(d, { attributes: true, attributeFilter: ['width', 'height'] });
       } catch (_) {}
     })();
   }
@@ -602,38 +600,41 @@
     return v.toFixed(2).replace(/\.?0+$/, '') + '×';
   }
 
-  // Apply zoom by setting the canvas display size directly in pixels,
-  // instead of going through CSS `zoom`. Reason: zoom interacts weirdly
-  // with flex children in Chromium — two snapshots showed
-  // rendered_w ≈ styleW / zoom (inverted!) when #dungeon was a flex
-  // item, because the engine treats the zoom factor as modifying layout
-  // space before resolving percentages. Bypass zoom entirely: size the
-  // canvas as buffer_logical_size × zoom and let flex layout + block
-  // sizing handle the rest.
-  var _applyingZoom = false;
+  // Apply zoom by changing webtiles' own `tile_viewport_scale` option
+  // rather than stretching the rendered canvas via CSS. Reasons:
+  //   - CSS `zoom` interacts pathologically with flex-item canvases
+  //     (ratios come out inverted).
+  //   - CSS transform or inline-px stretch both require the browser to
+  //     re-raster the canvas at a size != its drawing buffer, which on
+  //     iOS WebKit re-introduces the compositor layer caching bug
+  //     where vi-move sprite updates lag a turn behind.
+  //
+  // tile_viewport_scale is the cell-bitmap scale percentage webtiles
+  // uses during rendering. Lower scale = smaller cells = more cells
+  // fit in the viewport = wider effective view. Higher scale would
+  // make cells bigger, but webtiles' fit_to() clamps cells down to
+  // keep show_diameter (17) visible, so scales > 100 are capped on
+  // small phones. That's the known-acceptable tradeoff for v1.
   function applyZoomToDungeon(v) {
-    var d = document.getElementById('dungeon');
-    if (!d) return;
-    var dpr = window.devicePixelRatio || 1;
-    var bufW = d.width || 400;
-    var bufH = d.height || 272;
-    // Webtiles sizes the buffer at DPR multiples for retina, so logical
-    // display pixels are buffer÷DPR. Scale that by the user's zoom.
-    var targetW = Math.round((bufW / dpr) * v);
-    var targetH = Math.round((bufH / dpr) * v);
-    var curW = parseFloat(d.style.width);
-    var curH = parseFloat(d.style.height);
-    if (Math.abs(curW - targetW) < 1 && Math.abs(curH - targetH) < 1) return;
-    _applyingZoom = true;
+    var so = window.set_option;
+    if (typeof so !== 'function') return;
+    // Clamp to a sensible range. 20 = very far out, 200 = attempted
+    // zoom-in (will likely clamp back to default on narrow viewports).
+    var scale = Math.max(20, Math.min(200, Math.round(100 * v)));
     try {
-      d.style.setProperty('width',  targetW + 'px', 'important');
-      d.style.setProperty('height', targetH + 'px', 'important');
+      so('tile_viewport_scale', scale);
+      so('tile_map_scale', scale);
+    } catch (_) {}
+    // Ensure any stale inline width/height from earlier experiments
+    // is cleared so the canvas sits at its natural buffer-÷-DPR size.
+    var d = document.getElementById('dungeon');
+    if (d) {
+      d.style.removeProperty('width');
+      d.style.removeProperty('height');
       d.style.removeProperty('zoom');
-    } finally {
-      // Clear the flag after the mutation observer has had a chance to
-      // see and ignore our write.
-      requestAnimationFrame(function () { _applyingZoom = false; });
     }
+    // Nudge fit_to to rerun so the new scale takes effect immediately.
+    try { window.dispatchEvent(new Event('resize')); } catch (_) {}
   }
   function bumpZoom(delta) {
     var cur = loadZoom();
