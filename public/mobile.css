@@ -1,0 +1,248 @@
+/*
+ * crawl-mobile-webtiles injected stylesheet.
+ * Goals: make the DCSS webtiles client usable on a phone screen, and make
+ * room at the bottom for the on-screen keyboard overlay.
+ */
+
+:root {
+  --mwt-kbd-h: 280px;
+  --mwt-bg: #0a0a0a;
+  --mwt-fg: #ddd;
+  --mwt-key-bg: #1e1e1e;
+  --mwt-key-bg-active: #0a6aa0;
+  --mwt-key-bg-sticky: #7a3a0a;
+  --mwt-key-border: #333;
+  --mwt-key-fg: #eee;
+  --mwt-dir-bg: #121a2a;
+  --mwt-accent: #0a6aa0;
+  --mwt-gap: 3px;
+}
+
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  background: var(--mwt-bg);
+}
+
+/* Inputs should still be selectable so native IME works for login etc. */
+input, textarea, [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: auto;
+}
+
+/*
+ * Reserve space at the bottom of the viewport for the keyboard overlay.
+ * The webtiles client puts the game in #crt, #crt-container, #tile, #game
+ * etc.; we clamp the overall body to avoid hidden content.
+ */
+body.mwt-kbd-visible {
+  padding-bottom: var(--mwt-kbd-h) !important;
+  box-sizing: border-box;
+}
+
+body.mwt-kbd-visible #loader,
+body.mwt-kbd-visible #game,
+body.mwt-kbd-visible #crt-container,
+body.mwt-kbd-visible #chat {
+  max-height: calc(100vh - var(--mwt-kbd-h) - 8px) !important;
+}
+
+/* Collapse the chat panel by default on small screens - it eats too much room. */
+@media (max-width: 900px) {
+  #chat {
+    max-height: 30vh;
+  }
+  #chat_body {
+    max-height: 20vh !important;
+  }
+  /* Some webtiles versions have a sidebar; let it scroll within the viewport. */
+  .menu_contents, #menu_txt {
+    max-height: 60vh !important;
+  }
+}
+
+/* Scale the game canvas area down so it fits portrait phones.
+ * The webtiles client sizes the canvas to exact tile pixels; CSS transforms let
+ * us shrink the rendered output without the client knowing.
+ */
+@media (max-width: 900px) {
+  #dungeon {
+    transform-origin: top left;
+    max-width: 100vw !important;
+  }
+}
+
+/*
+ * Keyboard overlay
+ */
+#mwt-kbd {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2147483646;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mwt-gap);
+  padding: calc(var(--mwt-gap) + env(safe-area-inset-bottom, 0px)) var(--mwt-gap) env(safe-area-inset-bottom, 0px);
+  background: rgba(0, 0, 0, 0.92);
+  border-top: 1px solid #222;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--mwt-fg);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
+  height: var(--mwt-kbd-h);
+  box-sizing: border-box;
+}
+
+#mwt-kbd.mwt-hidden {
+  transform: translateY(calc(100% - 36px));
+}
+
+#mwt-kbd .mwt-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mwt-gap);
+  height: 28px;
+  flex: 0 0 auto;
+}
+
+#mwt-kbd .mwt-mode-switch {
+  display: flex;
+  gap: var(--mwt-gap);
+}
+
+#mwt-kbd .mwt-mode-switch button,
+#mwt-kbd .mwt-toggle {
+  background: var(--mwt-key-bg);
+  color: var(--mwt-fg);
+  border: 1px solid var(--mwt-key-border);
+  border-radius: 4px;
+  padding: 0 10px;
+  height: 26px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+#mwt-kbd .mwt-mode-switch button.mwt-mode-active {
+  background: var(--mwt-accent);
+  color: white;
+  border-color: var(--mwt-accent);
+}
+
+#mwt-kbd .mwt-panel {
+  display: none;
+  flex-direction: column;
+  gap: var(--mwt-gap);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#mwt-kbd .mwt-panel.mwt-panel-active {
+  display: flex;
+}
+
+#mwt-kbd .mwt-row {
+  display: flex;
+  gap: var(--mwt-gap);
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+#mwt-kbd .mwt-key {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--mwt-key-bg);
+  color: var(--mwt-key-fg);
+  border: 1px solid var(--mwt-key-border);
+  border-radius: 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 16px;
+  line-height: 1.05;
+  padding: 2px;
+  text-align: center;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#mwt-kbd .mwt-key .mwt-key-sub {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+#mwt-kbd .mwt-key.mwt-dir {
+  background: var(--mwt-dir-bg);
+  font-size: 18px;
+  font-weight: bold;
+}
+
+#mwt-kbd .mwt-key.mwt-pressed {
+  background: var(--mwt-key-bg-active);
+  border-color: var(--mwt-key-bg-active);
+  color: white;
+}
+
+#mwt-kbd .mwt-key.mwt-sticky {
+  background: var(--mwt-key-bg-sticky);
+  border-color: var(--mwt-key-bg-sticky);
+  color: white;
+}
+
+#mwt-kbd .mwt-key.mwt-wide-2 { flex-grow: 2; }
+#mwt-kbd .mwt-key.mwt-wide-3 { flex-grow: 3; }
+
+/* A group separator within a row (visual divider between D-pad and actions). */
+#mwt-kbd .mwt-sep {
+  flex: 0 0 var(--mwt-gap);
+}
+
+/* The d-pad cluster inside the game panel. */
+#mwt-kbd .mwt-dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: var(--mwt-gap);
+  flex: 0 0 42%;
+  min-width: 0;
+}
+
+#mwt-kbd .mwt-dpad .mwt-key {
+  font-size: 18px;
+}
+
+#mwt-kbd .mwt-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 1fr;
+  gap: var(--mwt-gap);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The fixed bottom bar shared across all modes. */
+#mwt-kbd .mwt-bottom {
+  display: flex;
+  gap: var(--mwt-gap);
+  flex: 0 0 44px;
+}
+
+/* Orientation-aware sizing */
+@media (min-height: 700px) and (orientation: portrait) {
+  :root { --mwt-kbd-h: 320px; }
+}
+@media (max-height: 480px), (orientation: landscape) {
+  :root { --mwt-kbd-h: 200px; }
+  #mwt-kbd .mwt-key { font-size: 14px; }
+}

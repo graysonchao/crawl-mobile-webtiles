@@ -1,0 +1,16 @@
+{
+  "name": "crawl-mobile-webtiles",
+  "version": "0.1.0",
+  "description": "Mobile-friendly proxy for DCSS webtiles with on-screen keyboard overlay",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  }
+}
