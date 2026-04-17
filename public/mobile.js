@@ -496,6 +496,10 @@
       }
       try {
         var mo = new MutationObserver(function () {
+          // Skip the mutation that our own applyZoomToDungeon just made,
+          // otherwise we'd loop: we write width/height -> observer fires
+          // -> applyZoomToDungeon writes width/height -> ...
+          if (_applyingZoom) return;
           requestAnimationFrame(function () { applyZoomToDungeon(loadZoom()); });
         });
         mo.observe(d, { attributes: true, attributeFilter: ['width', 'height', 'style'] });
@@ -598,15 +602,38 @@
     return v.toFixed(2).replace(/\.?0+$/, '') + '×';
   }
 
+  // Apply zoom by setting the canvas display size directly in pixels,
+  // instead of going through CSS `zoom`. Reason: zoom interacts weirdly
+  // with flex children in Chromium — two snapshots showed
+  // rendered_w ≈ styleW / zoom (inverted!) when #dungeon was a flex
+  // item, because the engine treats the zoom factor as modifying layout
+  // space before resolving percentages. Bypass zoom entirely: size the
+  // canvas as buffer_logical_size × zoom and let flex layout + block
+  // sizing handle the rest.
+  var _applyingZoom = false;
   function applyZoomToDungeon(v) {
     var d = document.getElementById('dungeon');
     if (!d) return;
-    // Direct property assignment is the universally-supported path for
-    // non-standard CSS properties like `zoom`. setProperty() is allowed
-    // to silently reject unknown property names, so belt-and-suspenders
-    // with both.
-    d.style.zoom = String(v);
-    try { d.style.setProperty('zoom', String(v), 'important'); } catch (_) {}
+    var dpr = window.devicePixelRatio || 1;
+    var bufW = d.width || 400;
+    var bufH = d.height || 272;
+    // Webtiles sizes the buffer at DPR multiples for retina, so logical
+    // display pixels are buffer÷DPR. Scale that by the user's zoom.
+    var targetW = Math.round((bufW / dpr) * v);
+    var targetH = Math.round((bufH / dpr) * v);
+    var curW = parseFloat(d.style.width);
+    var curH = parseFloat(d.style.height);
+    if (Math.abs(curW - targetW) < 1 && Math.abs(curH - targetH) < 1) return;
+    _applyingZoom = true;
+    try {
+      d.style.setProperty('width',  targetW + 'px', 'important');
+      d.style.setProperty('height', targetH + 'px', 'important');
+      d.style.removeProperty('zoom');
+    } finally {
+      // Clear the flag after the mutation observer has had a chance to
+      // see and ignore our write.
+      requestAnimationFrame(function () { _applyingZoom = false; });
+    }
   }
   function bumpZoom(delta) {
     var cur = loadZoom();

@@ -254,20 +254,21 @@ body.mwt-in-game #dungeon_block {
 }
 
 body.mwt-in-game #dungeon {
-  /* flex-basis 0 so the canvas is sized by remaining flex space, not
-   * by its drawing-buffer height. */
-  flex: 1 1 0 !important;
+  /* Zoom is applied as inline px width/height by JS (see
+   * applyZoomToDungeon in mobile.js). We don't force any CSS width /
+   * height here because that would fight the inline px sizing.
+   * flex: 0 0 auto means "take the content size (= our inline px)"
+   * rather than participating in grow/shrink. align-self: center keeps
+   * the canvas horizontally centred in #normal when it's narrower than
+   * the viewport; if it's wider, overflow on #normal clips the sides. */
+  flex: 0 0 auto !important;
   display: block !important;
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
+  align-self: center !important;
+  max-width: none !important;
+  max-height: none !important;
   min-width: 0 !important;
   min-height: 0 !important;
-  margin: 0 auto !important;
-  /* Actual zoom value is applied inline via JS on #dungeon itself
-   * because CSS `zoom` is non-standard and engines don't reliably
-   * resolve var() references in non-standard properties. */
+  margin: 0 !important;
   image-rendering: pixelated !important;
   image-rendering: crisp-edges !important;
   background: #000 !important;
