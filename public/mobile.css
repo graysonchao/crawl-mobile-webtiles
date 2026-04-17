@@ -147,6 +147,28 @@ body.mwt-in-game #game {
   box-sizing: border-box !important;
 }
 
+/* Webtiles' "layer" system puts #normal as a direct child of #game and
+ * hosts the actual gameplay view inside it (#left_column + #right_column
+ * live one level down under #normal). Our display: contents hoists the
+ * columns' children into #normal, not #game — so #normal is where the
+ * real flex column needs to happen or #dungeon's flex rules hit a plain
+ * block parent and fall back to block layout (which made zoom behave
+ * inversely: higher zoom -> smaller canvas). Promote #normal to flex. */
+body.mwt-in-game #normal {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  background: #000 !important;
+}
+
 /* Desktop webtiles splits #game into two inline columns: #left_column
  * holds the dungeon canvas, #right_column holds stats/minimap/monster
  * list/chat. Rather than trying to size them as flex items (which
