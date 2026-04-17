@@ -416,13 +416,10 @@
   function updateInGameClass() {
     var now = isInGame();
     document.body.classList.toggle('mwt-in-game', now);
-    if (now) {
-      // Re-apply zoom every tick while in-game. Cheap (just an inline
-      // style assignment) and defends against webtiles rewriting the
-      // canvas element's style during layout() recomputations.
-      applyZoomToDungeon(loadZoom());
-    }
     if (now && !lastInGame) {
+      // Apply zoom once on entry — set_option sticks, no need to hammer
+      // it every tick.
+      applyZoomToDungeon(loadZoom());
       forceDungeonResize();
       setTimeout(forceDungeonResize, 120);
       setTimeout(forceDungeonResize, 500);
@@ -480,29 +477,6 @@
     setInterval(updateInGameClass, 2500);
     window.addEventListener('hashchange', updateInGameClass);
     window.addEventListener('orientationchange', forceDungeonResize);
-    installDungeonReapplyWatcher();
-  }
-
-  // Observe the canvas's width/height attributes so we re-apply zoom
-  // every time webtiles rebuilds the canvas (fit_to runs), since that
-  // can reset inline styles.
-  function installDungeonReapplyWatcher() {
-    var tries = 0;
-    (function hook() {
-      var d = document.getElementById('dungeon');
-      if (!d) {
-        if (++tries < 120) return setTimeout(hook, 100);
-        return;
-      }
-      try {
-        // Only watch width/height (buffer) - no need to watch style
-        // since we don't touch canvas inline size any more.
-        var mo = new MutationObserver(function () {
-          requestAnimationFrame(function () { applyZoomToDungeon(loadZoom()); });
-        });
-        mo.observe(d, { attributes: true, attributeFilter: ['width', 'height'] });
-      } catch (_) {}
-    })();
   }
 
   // --------------------------------------------------------------------------
@@ -618,22 +592,12 @@
   function applyZoomToDungeon(v) {
     var so = window.set_option;
     if (typeof so !== 'function') return;
-    // Clamp to a sensible range. 20 = very far out, 200 = attempted
-    // zoom-in (will likely clamp back to default on narrow viewports).
     var scale = Math.max(20, Math.min(200, Math.round(100 * v)));
     try {
       so('tile_viewport_scale', scale);
       so('tile_map_scale', scale);
     } catch (_) {}
-    // Ensure any stale inline width/height from earlier experiments
-    // is cleared so the canvas sits at its natural buffer-÷-DPR size.
-    var d = document.getElementById('dungeon');
-    if (d) {
-      d.style.removeProperty('width');
-      d.style.removeProperty('height');
-      d.style.removeProperty('zoom');
-    }
-    // Nudge fit_to to rerun so the new scale takes effect immediately.
+    // Kick layout() so fit_to re-runs with the new scale.
     try { window.dispatchEvent(new Event('resize')); } catch (_) {}
   }
   function bumpZoom(delta) {
