@@ -589,14 +589,16 @@
   }
   function applyZoom(v) {
     document.documentElement.style.setProperty('--mwt-zoom', String(v));
-    // CSS `zoom` is non-standard so engines often don't resolve var()
-    // inside it. Set it inline on the canvas so the +/- buttons
-    // actually take effect.
     var d = document.getElementById('dungeon');
     if (d) {
-      d.style.setProperty('zoom', String(v), 'important');
-      // If the canvas just got wider/taller than its scroll wrapper,
-      // re-centre so the player sprite stays in view.
+      // Direct assignment is the universally-supported path for non-
+      // standard CSS properties like `zoom`. setProperty() is allowed to
+      // silently reject unknown property names in some engines, which
+      // is why the +/- buttons went quiet.
+      d.style.zoom = String(v);
+      // Also set as a belt-and-suspenders with important, which works
+      // in the engines that do support setProperty('zoom', ...).
+      try { d.style.setProperty('zoom', String(v), 'important'); } catch (_) {}
       centreDungeonScroll();
     }
   }
@@ -605,7 +607,6 @@
     var wrap = document.getElementById('mwt-dungeon-wrap');
     var d = document.getElementById('dungeon');
     if (!wrap || !d) return;
-    // Read post-zoom dimensions via the rendered bounding box.
     var dr = d.getBoundingClientRect();
     var wr = wrap.getBoundingClientRect();
     wrap.scrollLeft = Math.max(0, (dr.width  - wr.width)  / 2);
@@ -621,11 +622,67 @@
     wrap.id = 'mwt-dungeon-wrap';
     parent.insertBefore(wrap, d);
     wrap.appendChild(d);
-    // Apply current zoom to freshly-parented canvas, then centre.
+    installPanInterceptor(wrap);
+    // Apply current zoom to the freshly-parented canvas, then centre.
     var z = loadZoom();
-    d.style.setProperty('zoom', String(z), 'important');
-    // After the next layout pass (so boundingClientRect is valid).
+    d.style.zoom = String(z);
+    try { d.style.setProperty('zoom', String(z), 'important'); } catch (_) {}
     requestAnimationFrame(centreDungeonScroll);
+  }
+
+  // Webtiles' mouse_control.js binds touchstart/touchmove on #dungeon for
+  // click-to-move. Native overflow: auto scroll doesn't get a chance
+  // because those listeners fire on the canvas itself. We need to grab
+  // drag gestures in the capture phase on the wrapper (which is an
+  // ancestor of the canvas so our capture listener runs before any
+  // listener installed on the canvas) and drive scroll manually.
+  //
+  // Taps (move < threshold) are not intercepted so click-to-move still
+  // works.
+  function installPanInterceptor(wrap) {
+    var startX = 0, startY = 0, startScrollLeft = 0, startScrollTop = 0;
+    var panning = false;
+    var PAN_THRESHOLD = 8; // px
+
+    wrap.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startScrollLeft = wrap.scrollLeft;
+      startScrollTop = wrap.scrollTop;
+      panning = false;
+    }, { capture: true, passive: true });
+
+    wrap.addEventListener('touchmove', function (e) {
+      if (e.touches.length !== 1) return;
+      var t = e.touches[0];
+      var dx = t.clientX - startX;
+      var dy = t.clientY - startY;
+      if (!panning && (Math.abs(dx) > PAN_THRESHOLD || Math.abs(dy) > PAN_THRESHOLD)) {
+        panning = true;
+      }
+      if (panning) {
+        // Block webtiles' drag handlers and drive scroll ourselves.
+        e.stopPropagation();
+        if (e.cancelable) e.preventDefault();
+        wrap.scrollLeft = startScrollLeft - dx;
+        wrap.scrollTop = startScrollTop - dy;
+      }
+    }, { capture: true, passive: false });
+
+    wrap.addEventListener('touchend', function (e) {
+      if (panning) {
+        // Eat the end event too so webtiles doesn't interpret the drag
+        // release as a tap-to-move.
+        e.stopPropagation();
+        if (e.cancelable) e.preventDefault();
+        panning = false;
+      }
+    }, { capture: true, passive: false });
+
+    wrap.addEventListener('touchcancel', function () {
+      panning = false;
+    }, { capture: true, passive: true });
   }
   function bumpZoom(delta) {
     var cur = loadZoom();
