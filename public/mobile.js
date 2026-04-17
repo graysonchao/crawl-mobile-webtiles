@@ -608,7 +608,7 @@
   // --------------------------------------------------------------------------
 
   function dumpDomSnapshot() {
-    var ids = ['game','dungeon','dungeon_pane','stats','stats_titleline','message_pane','messages_container','messages','minimap_block','minimap','monster_list','action-panel','chat','crt','crt-container','lobby','loader','ui-stack'];
+    var ids = ['game','left_column','right_column','dungeon','dungeon_pane','stats','stats_titleline','message_pane','messages_container','messages','minimap_block','minimap','monster_list','action-panel','chat','crt','crt-container','lobby','loader','ui-stack'];
     var savedZoom = null;
     try { savedZoom = localStorage.getItem('mwt-zoom'); } catch (_) {}
     var dungeon = document.getElementById('dungeon');

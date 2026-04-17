@@ -147,6 +147,41 @@ body.mwt-in-game #game {
   box-sizing: border-box !important;
 }
 
+/* Desktop webtiles splits #game into two inline columns: #left_column
+ * holds the dungeon canvas, #right_column holds stats/minimap/monster
+ * list/chat. On mobile we've turned #game into a vertical flex stack;
+ * both columns need to span the full viewport width (and not cling to
+ * their inline-block defaults or JS-set widths), otherwise the canvas
+ * inherits a tiny ~150px parent and width:100% renders microscopically. */
+body.mwt-in-game #left_column,
+body.mwt-in-game #right_column {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  float: none !important;
+  position: static !important;
+  box-sizing: border-box !important;
+}
+
+/* The left column owns the dungeon; let it fill the remaining flex
+ * space so #dungeon (which is flex: 1 1 0 inside) grows to fit. */
+body.mwt-in-game #left_column {
+  flex: 1 1 0 !important;
+  overflow: hidden !important;
+}
+
+/* The right column hosts stats etc.; since we re-position #stats and
+ * #message_pane via our own CSS, the right column itself can collapse. */
+body.mwt-in-game #right_column {
+  flex: 0 0 auto !important;
+}
+
 /* Stats strip at the top. Compact font, two columns so lines pack tighter. */
 body.mwt-in-game #stats {
   flex: 0 0 auto !important;
