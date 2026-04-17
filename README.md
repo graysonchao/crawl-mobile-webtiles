@@ -1,6 +1,6 @@
 # crawl-mobile-webtiles
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/graysonchao/crawl-mobile-webtiles)
+[**Remix on Glitch**](https://glitch.com/edit/#!/import/github/graysonchao/crawl-mobile-webtiles) · [Deploy to Render](https://render.com/deploy?repo=https://github.com/graysonchao/crawl-mobile-webtiles)
 
 A tiny Node.js proxy that makes [Dungeon Crawl Stone Soup](https://crawl.develz.org/)
 WebTiles playable on a phone.
@@ -20,20 +20,29 @@ protocol work is required.
 
 ## Quick start
 
-### Hosted on Render (phone-friendly)
+### Hosted on Glitch (phone-friendly, no GitHub auth)
 
-Tap the **Deploy to Render** button above. Render will:
+Tap the **Remix on Glitch** button above. Glitch fetches this repo as a
+public tarball — no GitHub OAuth needed.
 
-1. Ask you to sign in with GitHub and authorize access to this repo.
-2. Read `render.yaml`, create a free web service, and start deploying.
-3. When the deploy finishes you'll get a `https://<name>.onrender.com` URL —
-   open that on your phone and log in with your WebTiles account.
+1. If Glitch asks you to sign in, any login method is fine (Google, email, etc).
+2. Glitch picks up `glitch.json` / `package.json`, runs `npm install`, then
+   `npm start`. Logs are in the *Tools → Logs* pane.
+3. Tap *Share → Live site*. You get a `https://<your-project>.glitch.me` URL
+   — open that on your phone and log in with your WebTiles account.
+4. To point at a different upstream, edit the project's `.env` in the Glitch
+   editor and add `DCSS_UPSTREAM=https://your-server` (Glitch auto-loads
+   `.env` into `process.env`). Our server already reads that var.
 
-Free tier gotcha: the service sleeps after ~15 minutes of inactivity, so the
-first request after a break takes ~30-60 s while it wakes up. Upgrade to the
-$7/mo Starter plan if you want it always-on. You can change `DCSS_UPSTREAM`
-in Render's dashboard under the service's *Environment* tab if you prefer a
-different public server (list below).
+Free-tier gotcha: the project sleeps after ~5 minutes of idle; first request
+wakes it back up in a few seconds. Glitch gives you ~1000 hours/month on the
+free plan.
+
+### Hosted on Render
+
+The `render.yaml` blueprint also works if you prefer Render. Tap **Deploy to
+Render** above and authorize GitHub access. Sleeps after ~15 min idle on the
+free plan; $7/mo keeps it always-on.
 
 ### Local
 

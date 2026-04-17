@@ -1,0 +1,23 @@
+{
+  "install": "npm install",
+  "start": "npm start",
+  "watch": {
+    "ignore": [
+      "\\.git$",
+      "node_modules",
+      "^public/"
+    ],
+    "install": {
+      "include": [
+        "^package\\.json$",
+        "^package-lock\\.json$"
+      ]
+    },
+    "restart": {
+      "include": [
+        "^server\\.js$"
+      ]
+    },
+    "throttle": 1000
+  }
+}
