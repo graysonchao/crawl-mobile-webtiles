@@ -314,6 +314,33 @@
     });
     topbar.appendChild(modeSwitch);
 
+    // Zoom controls + debug + hide, grouped on the right.
+    var rightGroup = el('div', 'mwt-right-group');
+
+    var zoomOut = document.createElement('button');
+    zoomOut.type = 'button';
+    zoomOut.textContent = '−';
+    zoomOut.className = 'mwt-toggle mwt-zoom-btn';
+    zoomOut.title = 'Zoom out';
+    zoomOut.addEventListener('click', function () { bumpZoom(-0.15); });
+    rightGroup.appendChild(zoomOut);
+
+    var zoomIn = document.createElement('button');
+    zoomIn.type = 'button';
+    zoomIn.textContent = '+';
+    zoomIn.className = 'mwt-toggle mwt-zoom-btn';
+    zoomIn.title = 'Zoom in';
+    zoomIn.addEventListener('click', function () { bumpZoom(+0.15); });
+    rightGroup.appendChild(zoomIn);
+
+    var debugBtn = document.createElement('button');
+    debugBtn.type = 'button';
+    debugBtn.textContent = '…';
+    debugBtn.className = 'mwt-toggle';
+    debugBtn.title = 'Copy DOM snapshot to clipboard';
+    debugBtn.addEventListener('click', dumpDomSnapshot);
+    rightGroup.appendChild(debugBtn);
+
     var toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.textContent = '▾';
@@ -323,7 +350,9 @@
       root.classList.toggle('mwt-hidden');
       toggle.textContent = root.classList.contains('mwt-hidden') ? '▴' : '▾';
     });
-    topbar.appendChild(toggle);
+    rightGroup.appendChild(toggle);
+
+    topbar.appendChild(rightGroup);
     root.appendChild(topbar);
 
     panels.game   = buildGamePanel();
@@ -342,8 +371,69 @@
 
     document.body.appendChild(root);
     document.body.classList.add('mwt-kbd-visible');
+    document.body.classList.add('mwt-mobile');
+    applyZoom(loadZoom());
     setMode('game');
     renderMods();
+
+    // Nudge webtiles to re-layout now that we've changed the available
+    // space (it listens for window resize and calls fit_to).
+    setTimeout(function () {
+      try { window.dispatchEvent(new Event('resize')); } catch (_) {}
+    }, 50);
+  }
+
+  // --------------------------------------------------------------------------
+  // Zoom (CSS scale on #dungeon, persisted in localStorage)
+  // --------------------------------------------------------------------------
+
+  function loadZoom() {
+    var v = parseFloat(localStorage.getItem('mwt-zoom'));
+    if (!(v > 0.5 && v < 4)) v = 1.75;
+    return v;
+  }
+  function saveZoom(v) {
+    try { localStorage.setItem('mwt-zoom', String(v)); } catch (_) {}
+  }
+  function applyZoom(v) {
+    document.documentElement.style.setProperty('--mwt-zoom', String(v));
+  }
+  function bumpZoom(delta) {
+    var cur = loadZoom();
+    var next = Math.max(0.75, Math.min(3.5, Math.round((cur + delta) * 100) / 100));
+    saveZoom(next);
+    applyZoom(next);
+  }
+
+  // --------------------------------------------------------------------------
+  // Debug: dump DOM structure so the user can share it if layout is off.
+  // --------------------------------------------------------------------------
+
+  function dumpDomSnapshot() {
+    var ids = ['game','dungeon','dungeon_pane','stats','stats_titleline','message_pane','messages_container','messages','minimap_block','minimap','monster_list','action-panel','chat','crt','crt-container','lobby','loader','ui-stack'];
+    var summary = { url: location.href, innerWidth: innerWidth, innerHeight: innerHeight, dpr: devicePixelRatio };
+    ids.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) { summary[id] = null; return; }
+      var r = el.getBoundingClientRect();
+      summary[id] = {
+        display: getComputedStyle(el).display,
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+        top: Math.round(r.top),
+        left: Math.round(r.left),
+        children: el.children.length,
+        tag: el.tagName,
+      };
+    });
+    var text = JSON.stringify(summary, null, 2);
+    console.log('[mwt] DOM snapshot:\n' + text);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+      }
+    } catch (_) {}
+    alert('DOM snapshot copied to clipboard (also in console).');
   }
 
   function modeLabel(m) {
