@@ -423,8 +423,16 @@
   function forceDungeonResize() {
     var c = document.getElementById('dungeon');
     if (c) {
+      // Clear both inline CSS sizes (which webtiles sets on every fit_to)
+      // and the canvas's width/height attributes (the drawing buffer).
+      // Without zeroing the buffer, webtiles may measure the too-tall
+      // current canvas when recomputing and re-derive the same wrong size.
       c.style.removeProperty('width');
       c.style.removeProperty('height');
+      try {
+        if (c.width && c.width > 0) c.setAttribute('width', '1');
+        if (c.height && c.height > 0) c.setAttribute('height', '1');
+      } catch (_) {}
     }
     try { window.dispatchEvent(new Event('resize')); } catch (_) {}
   }
@@ -475,13 +483,14 @@
 
   function dumpDomSnapshot() {
     var ids = ['game','dungeon','dungeon_pane','stats','stats_titleline','message_pane','messages_container','messages','minimap_block','minimap','monster_list','action-panel','chat','crt','crt-container','lobby','loader','ui-stack'];
-    var summary = { url: location.href, innerWidth: innerWidth, innerHeight: innerHeight, dpr: devicePixelRatio };
+    var summary = { url: location.href, innerWidth: innerWidth, innerHeight: innerHeight, dpr: devicePixelRatio, inGame: isInGame() };
     ids.forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) { summary[id] = null; return; }
       var r = el.getBoundingClientRect();
-      summary[id] = {
-        display: getComputedStyle(el).display,
+      var cs = getComputedStyle(el);
+      var entry = {
+        display: cs.display,
         w: Math.round(r.width),
         h: Math.round(r.height),
         top: Math.round(r.top),
@@ -489,6 +498,21 @@
         children: el.children.length,
         tag: el.tagName,
       };
+      // Canvas-specific: capture the drawing buffer dims (width/height
+      // attributes) and the inline style dims, which are often different
+      // from the rendered size and tell us what fit_to decided.
+      if (el.tagName === 'CANVAS') {
+        entry.bufW = el.width;
+        entry.bufH = el.height;
+        entry.styleW = el.style.width || null;
+        entry.styleH = el.style.height || null;
+      }
+      // Also capture any inline style dims on non-canvas nodes for diffing.
+      if (el.style && (el.style.width || el.style.height)) {
+        entry.styleW = el.style.width || null;
+        entry.styleH = el.style.height || null;
+      }
+      summary[id] = entry;
     });
     var text = JSON.stringify(summary, null, 2);
     console.log('[mwt] DOM snapshot:\n' + text);
