@@ -396,10 +396,14 @@
   // --------------------------------------------------------------------------
 
   function isInGame() {
-    var game = document.getElementById('game');
-    if (!game) return false;
-    if (game.offsetParent === null && getComputedStyle(game).position !== 'fixed') return false;
-    return !!(document.getElementById('dungeon') || document.getElementById('stats'));
+    // Fast path: #dungeon only exists when the game view is actually
+    // rendered. Skip getComputedStyle on the hot path so this is cheap
+    // enough to call from a throttled observer during gameplay.
+    var d = document.getElementById('dungeon');
+    if (d && (d.offsetWidth > 0 || d.width > 0)) return true;
+    var s = document.getElementById('stats');
+    if (s && s.offsetWidth > 0) return true;
+    return false;
   }
 
   var lastInGame = false;
@@ -440,18 +444,35 @@
 
   function installGameStateWatcher() {
     updateInGameClass();
-    try {
-      var mo = new MutationObserver(function () { updateInGameClass(); });
-      mo.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['style', 'class'],
+    // MutationObserver on body subtree fires every time webtiles appends
+    // a message, updates a stat span, etc. — many times per turn. Coalesce
+    // into a single rAF-scheduled check so we never run updateInGameClass
+    // more than once per frame. Also scope attribute watching to the
+    // #game root swap (display/class) rather than the whole subtree, which
+    // is where in-game entry/exit signals live anyway.
+    var pending = false;
+    function schedule() {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(function () {
+        pending = false;
+        updateInGameClass();
       });
-    } catch (_) { /* old browsers: rely on polling below */ }
-    // Polling fallback — cheap, covers cases the observer misses (e.g. when
-    // webtiles toggles display via class swaps we don't see).
-    setInterval(updateInGameClass, 750);
+    }
+    try {
+      // Watch only the direct children of body for add/remove (the game/
+      // lobby/crt root swaps) and watch #game itself for style/display
+      // flips. Don't observe subtree — a 30-cells-per-turn canvas update
+      // fans out to hundreds of notifications we don't care about.
+      var coarseMo = new MutationObserver(schedule);
+      coarseMo.observe(document.body, { childList: true });
+      var game = document.getElementById('game');
+      if (game) {
+        var fineMo = new MutationObserver(schedule);
+        fineMo.observe(game, { attributes: true, attributeFilter: ['style', 'class'] });
+      }
+    } catch (_) { /* rely on slow polling + hashchange below */ }
+    setInterval(updateInGameClass, 2500);
     window.addEventListener('hashchange', updateInGameClass);
     window.addEventListener('orientationchange', forceDungeonResize);
   }

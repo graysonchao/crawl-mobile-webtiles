@@ -215,10 +215,7 @@ body.mwt-in-game #dungeon_block {
 
 body.mwt-in-game #dungeon {
   /* flex-basis 0 (not auto) so the canvas is sized purely by remaining
-   * flex space, not by its drawing-buffer height. With basis=auto, a
-   * huge canvas buffer (webtiles often sets 400x2000+) would make the
-   * element's content size enormous and max-height:100% couldn't beat
-   * it. */
+   * flex space, not by its drawing-buffer height. */
   flex: 1 1 0 !important;
   display: block !important;
   width: 100% !important;
@@ -228,8 +225,14 @@ body.mwt-in-game #dungeon {
   min-width: 0 !important;
   min-height: 0 !important;
   margin: 0 auto !important;
-  transform: scale(var(--mwt-zoom)) !important;
+  transform: scale(var(--mwt-zoom)) translateZ(0) !important;
   transform-origin: 50% 50% !important;
+  /* will-change puts #dungeon on its own compositor layer so each canvas
+   * update (FoV reveal, player move, cell change) repaints only the
+   * canvas bitmap, not the whole flex column. Also defeats some iOS
+   * Safari quirks where transformed canvases coalesce frames. */
+  will-change: transform, contents !important;
+  backface-visibility: hidden !important;
   image-rendering: pixelated !important;
   image-rendering: crisp-edges !important;
   background: #000 !important;
