@@ -612,15 +612,41 @@
 
   // Pull display.invalidate(true) + display.display() via RequireJS so
   // we can force a full repaint after fit_to clears the canvas buffer.
-  // display.invalidate(true) marks every visible cell dirty;
-  // display.display() renders dirty cells from map_knowledge.
   function redrawAllCells() {
-    var mod = tryRequire(['display', './display', 'game_data/static/display']);
-    if (!mod || typeof mod.invalidate !== 'function' || typeof mod.display !== 'function') return;
+    var mod = findDisplayModule();
+    if (!mod) return;
     try {
       mod.invalidate(true);
       mod.display();
     } catch (_) {}
+  }
+
+  // Cache + finder: try known module ids, else brute-force scan all
+  // defined modules in the default RequireJS context for one that looks
+  // like the display module (exports both invalidate and display).
+  var _displayModule = null;
+  function findDisplayModule() {
+    if (_displayModule) return _displayModule;
+    _displayModule = tryRequire([
+      'display', './display',
+      'game_data/static/display',
+      'static/display',
+    ]);
+    if (_displayModule) return _displayModule;
+    try {
+      var req = window.require || window.requirejs;
+      var defined = req && req.s && req.s.contexts && req.s.contexts._
+                    && req.s.contexts._.defined;
+      if (!defined) return null;
+      for (var name in defined) {
+        var m = defined[name];
+        if (m && typeof m.invalidate === 'function' && typeof m.display === 'function') {
+          _displayModule = m;
+          return m;
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   function tryRequire(names) {
@@ -655,6 +681,16 @@
       dungeonInlineZoom: dungeon ? (dungeon.style.zoom || null) : null,
       dungeonComputedZoom: dungeon ? (getComputedStyle(dungeon).zoom || null) : null,
       dungeonParentId: dungeon && dungeon.parentNode ? (dungeon.parentNode.id || dungeon.parentNode.tagName) : null,
+      hasSetOption: typeof window.set_option === 'function',
+      displayModule: !!findDisplayModule(),
+      requireDefinedCount: (function () {
+        try {
+          var req = window.require || window.requirejs;
+          var defined = req && req.s && req.s.contexts && req.s.contexts._
+                        && req.s.contexts._.defined;
+          return defined ? Object.keys(defined).length : null;
+        } catch (_) { return null; }
+      })(),
     };
     // Walk #game's direct children so we can see who else is competing
     // for flex space. Lists the DOM order with id/tag/display/size/flex.
