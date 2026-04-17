@@ -160,8 +160,13 @@ body.mwt-in-game #right_column {
   display: contents !important;
 }
 
-/* Stats strip at the top. Compact font, two columns so lines pack tighter. */
+/* Stats strip at the top. Compact font, two columns so lines pack tighter.
+ * order: -1 forces it above #dungeon in the flex stack regardless of
+ * DOM order — webtiles puts #left_column (dungeon) before #right_column
+ * (stats) in the DOM, so with display: contents dissolving the columns
+ * stats would otherwise land at the bottom of the game area. */
 body.mwt-in-game #stats {
+  order: -1 !important;
   flex: 0 0 auto !important;
   display: block !important;
   position: static !important;
