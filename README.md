@@ -1,6 +1,6 @@
 # crawl-mobile-webtiles
 
-[![Run on Replit](https://replit.com/badge/github/graysonchao/crawl-mobile-webtiles)](https://replit.com/github/graysonchao/crawl-mobile-webtiles) · [Deploy to Render](https://render.com/deploy?repo=https://github.com/graysonchao/crawl-mobile-webtiles)
+[![Run on Replit](https://replit.com/badge/github/graysonchao/crawl-mobile-webtiles)](https://replit.com/github.com/graysonchao/crawl-mobile-webtiles) · [Deploy to Render](https://render.com/deploy?repo=https://github.com/graysonchao/crawl-mobile-webtiles)
 
 A tiny Node.js proxy that makes [Dungeon Crawl Stone Soup](https://crawl.develz.org/)
 WebTiles playable on a phone.
@@ -22,9 +22,12 @@ protocol work is required.
 
 ### Hosted on Replit (phone-friendly, no GitHub auth)
 
-Tap the **Run on Replit** button above. Replit imports public GitHub repos
-by URL — it fetches the repo as a public tarball and doesn't ask for any
-GitHub OAuth grant.
+Tap the **Run on Replit** button above (or paste the URL directly — the
+`github.com/...` path triggers Replit's *rapid import* which is a plain
+`git clone` into a new Repl; the `github/...` path goes through the Replit
+Agent LLM, which you probably don't want touching the code). Rapid import
+pulls the repo as a public tarball and doesn't ask for any GitHub OAuth
+grant.
 
 1. Sign in to Replit with any provider (Google, email, etc.) if you aren't
    already.
