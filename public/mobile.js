@@ -597,8 +597,41 @@
       so('tile_viewport_scale', scale);
       so('tile_map_scale', scale);
     } catch (_) {}
-    // Kick layout() so fit_to re-runs with the new scale.
+    // Kick layout() so fit_to re-runs with the new scale. fit_to
+    // internally calls set_size which re-inits the canvas and clears
+    // the buffer, so afterwards we need to explicitly repaint all
+    // visible cells from map_knowledge, otherwise the screen stays
+    // black until the next server-pushed cell update.
     try { window.dispatchEvent(new Event('resize')); } catch (_) {}
+    // Two-frame delay so webtiles' resize handler + fit_to have
+    // finished before we invalidate+display.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(redrawAllCells);
+    });
+  }
+
+  // Pull display.invalidate(true) + display.display() via RequireJS so
+  // we can force a full repaint after fit_to clears the canvas buffer.
+  // display.invalidate(true) marks every visible cell dirty;
+  // display.display() renders dirty cells from map_knowledge.
+  function redrawAllCells() {
+    var mod = tryRequire(['display', './display', 'game_data/static/display']);
+    if (!mod || typeof mod.invalidate !== 'function' || typeof mod.display !== 'function') return;
+    try {
+      mod.invalidate(true);
+      mod.display();
+    } catch (_) {}
+  }
+
+  function tryRequire(names) {
+    if (typeof window.require !== 'function') return null;
+    for (var i = 0; i < names.length; i++) {
+      try {
+        var m = window.require(names[i]);
+        if (m) return m;
+      } catch (_) {}
+    }
+    return null;
   }
   function bumpZoom(delta) {
     var cur = loadZoom();
