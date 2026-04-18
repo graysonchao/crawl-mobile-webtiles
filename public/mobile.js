@@ -477,6 +477,30 @@
     setInterval(updateInGameClass, 2500);
     window.addEventListener('hashchange', updateInGameClass);
     window.addEventListener('orientationchange', forceDungeonResize);
+    installDungeonReapplyWatcher();
+  }
+
+  // Webtiles rewrites canvas.style.width/.height on every fit_to pass.
+  // Re-apply our zoom whenever the width/height attrs (drawing buffer)
+  // change so the canvas display stays at user-chosen zoom even after
+  // a fit_to. The _applyingZoom flag in applyZoomToDungeon lets us
+  // skip our own writes and avoid an infinite observer loop.
+  function installDungeonReapplyWatcher() {
+    var tries = 0;
+    (function hook() {
+      var d = document.getElementById('dungeon');
+      if (!d) {
+        if (++tries < 120) return setTimeout(hook, 100);
+        return;
+      }
+      try {
+        var mo = new MutationObserver(function () {
+          if (_applyingZoom) return;
+          requestAnimationFrame(function () { applyZoomToDungeon(loadZoom()); });
+        });
+        mo.observe(d, { attributes: true, attributeFilter: ['width', 'height'] });
+      } catch (_) {}
+    })();
   }
 
   // --------------------------------------------------------------------------
@@ -574,131 +598,107 @@
     return v.toFixed(2).replace(/\.?0+$/, '') + '×';
   }
 
-  // Apply zoom by changing webtiles' own `tile_viewport_scale` option
-  // rather than stretching the rendered canvas via CSS. Reasons:
-  //   - CSS `zoom` interacts pathologically with flex-item canvases
-  //     (ratios come out inverted).
-  //   - CSS transform or inline-px stretch both require the browser to
-  //     re-raster the canvas at a size != its drawing buffer, which on
-  //     iOS WebKit re-introduces the compositor layer caching bug
-  //     where vi-move sprite updates lag a turn behind.
-  //
-  // tile_viewport_scale is the cell-bitmap scale percentage webtiles
-  // uses during rendering. Lower scale = smaller cells = more cells
-  // fit in the viewport = wider effective view. Higher scale would
-  // make cells bigger, but webtiles' fit_to() clamps cells down to
-  // keep show_diameter (17) visible, so scales > 100 are capped on
-  // small phones. That's the known-acceptable tradeoff for v1.
+  // Zoom by stretching the canvas display via inline px sizes, with
+  // the canvas wrapped in an overflow: auto container so the user can
+  // pan around when the zoomed canvas exceeds the viewport. Touch pan
+  // goes through a capture-phase handler that beats webtiles'
+  // click-to-move listeners on the canvas.
+  var _applyingZoom = false;
   function applyZoomToDungeon(v) {
-    var so = window.set_option;
-    if (typeof so !== 'function') return;
-    var scale = Math.max(20, Math.min(200, Math.round(100 * v)));
+    ensureDungeonWrapper();
+    var d = document.getElementById('dungeon');
+    if (!d) return;
+    var dpr = window.devicePixelRatio || 1;
+    var bufW = d.width  || 400;
+    var bufH = d.height || 272;
+    // Native display = buffer ÷ DPR. Scale by user zoom.
+    var targetW = Math.round((bufW / dpr) * v);
+    var targetH = Math.round((bufH / dpr) * v);
+    _applyingZoom = true;
     try {
-      so('tile_viewport_scale', scale);
-      so('tile_map_scale', scale);
-    } catch (_) {}
-    // Skip the dispatchEvent('resize') -> layout() path: layout() has
-    // a layout_params_differ() early-return that fires whenever
-    // window.innerWidth/innerHeight haven't changed, which means every
-    // press after the first short-circuits without calling fit_to.
-    // Instead, grab dungeon_renderer directly and call fit_to with the
-    // same args layout() would have computed.
-    requestAnimationFrame(function () {
-      refitDungeon();
-      requestAnimationFrame(redrawAllCells);
-    });
-  }
-
-  function refitDungeon() {
-    var dr = findDungeonRenderer();
-    if (!dr || typeof dr.fit_to !== 'function') return;
-    // Match webtiles' layout():
-    //   remaining_width  = innerWidth  - stat_width
-    //   remaining_height = innerHeight - msg_height
-    // We already patched jQuery's outerWidth/outerHeight on #stats /
-    // #messages to return mobile-correct values (stat_width = 0,
-    // msg_height = kbd+stats+msg), so we mirror that math here.
-    var kbdH = cssPx('--mwt-kbd-h', 280);
-    var msgH = cssPx('--mwt-msg-h', 78);
-    var statsEl = document.getElementById('stats');
-    var statsH = statsEl ? statsEl.getBoundingClientRect().height : 90;
-    var w = window.innerWidth;
-    var h = window.innerHeight - (kbdH + statsH + msgH);
-    try { dr.fit_to(w, h, 17); } catch (_) {}
-  }
-
-  // Pull display.invalidate(true) + display.display() via RequireJS so
-  // we can force a full repaint after fit_to clears the canvas buffer.
-  function redrawAllCells() {
-    var mod = findDisplayModule();
-    if (!mod) return;
-    try {
-      mod.invalidate(true);
-      mod.display();
-    } catch (_) {}
-  }
-
-  // Cache + finder: try known module ids, else brute-force scan all
-  // defined modules in the default RequireJS context for one that looks
-  // like the display module (exports both invalidate and display).
-  var _displayModule = null;
-  function findDisplayModule() {
-    if (_displayModule) return _displayModule;
-    _displayModule = tryRequire([
-      'display', './display',
-      'game_data/static/display',
-      'static/display',
-    ]);
-    if (_displayModule) return _displayModule;
-    _displayModule = scanDefined(function (m) {
-      return m && typeof m.invalidate === 'function' && typeof m.display === 'function';
-    });
-    return _displayModule;
-  }
-
-  var _dungeonRenderer = null;
-  function findDungeonRenderer() {
-    if (_dungeonRenderer) return _dungeonRenderer;
-    _dungeonRenderer = tryRequire([
-      'dungeon_renderer', './dungeon_renderer',
-      'game_data/static/dungeon_renderer',
-    ]);
-    if (_dungeonRenderer) return _dungeonRenderer;
-    _dungeonRenderer = scanDefined(function (m) {
-      return m && typeof m.fit_to === 'function' && typeof m.set_view_center === 'function';
-    });
-    return _dungeonRenderer;
-  }
-
-  function scanDefined(predicate) {
-    try {
-      var req = window.require || window.requirejs;
-      var defined = req && req.s && req.s.contexts && req.s.contexts._
-                    && req.s.contexts._.defined;
-      if (!defined) return null;
-      for (var name in defined) {
-        if (predicate(defined[name])) return defined[name];
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  function tryRequire(names) {
-    if (typeof window.require !== 'function') return null;
-    for (var i = 0; i < names.length; i++) {
-      try {
-        var m = window.require(names[i]);
-        if (m) return m;
-      } catch (_) {}
+      d.style.setProperty('width',  targetW + 'px', 'important');
+      d.style.setProperty('height', targetH + 'px', 'important');
+    } finally {
+      requestAnimationFrame(function () { _applyingZoom = false; });
     }
-    return null;
+    requestAnimationFrame(centreDungeonScroll);
   }
+
+  function centreDungeonScroll() {
+    var wrap = document.getElementById('mwt-dungeon-wrap');
+    var d = document.getElementById('dungeon');
+    if (!wrap || !d) return;
+    var dr = d.getBoundingClientRect();
+    var wr = wrap.getBoundingClientRect();
+    wrap.scrollLeft = Math.max(0, (dr.width  - wr.width)  / 2);
+    wrap.scrollTop  = Math.max(0, (dr.height - wr.height) / 2);
+  }
+
+  function ensureDungeonWrapper() {
+    var d = document.getElementById('dungeon');
+    if (!d) return;
+    var parent = d.parentNode;
+    if (parent && parent.id === 'mwt-dungeon-wrap') return;
+    var wrap = document.createElement('div');
+    wrap.id = 'mwt-dungeon-wrap';
+    parent.insertBefore(wrap, d);
+    wrap.appendChild(d);
+    installPanInterceptor(wrap);
+  }
+
+  // Webtiles' mouse_control.js binds touchstart/touchmove on #dungeon
+  // for click-to-move; native overflow: auto scroll doesn't win
+  // because those listeners call preventDefault. Capture the drag at
+  // the wrapper (ancestor of canvas, so our capture listener fires
+  // first) and drive scrollLeft/scrollTop manually past a 8 px
+  // threshold. Taps under the threshold pass through so click-to-move
+  // still works.
+  function installPanInterceptor(wrap) {
+    var startX = 0, startY = 0, startScrollLeft = 0, startScrollTop = 0;
+    var panning = false;
+    var PAN_THRESHOLD = 8;
+
+    wrap.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startScrollLeft = wrap.scrollLeft;
+      startScrollTop = wrap.scrollTop;
+      panning = false;
+    }, { capture: true, passive: true });
+
+    wrap.addEventListener('touchmove', function (e) {
+      if (e.touches.length !== 1) return;
+      var t = e.touches[0];
+      var dx = t.clientX - startX;
+      var dy = t.clientY - startY;
+      if (!panning && (Math.abs(dx) > PAN_THRESHOLD || Math.abs(dy) > PAN_THRESHOLD)) {
+        panning = true;
+      }
+      if (panning) {
+        e.stopPropagation();
+        if (e.cancelable) e.preventDefault();
+        wrap.scrollLeft = startScrollLeft - dx;
+        wrap.scrollTop  = startScrollTop  - dy;
+      }
+    }, { capture: true, passive: false });
+
+    wrap.addEventListener('touchend', function (e) {
+      if (panning) {
+        e.stopPropagation();
+        if (e.cancelable) e.preventDefault();
+        panning = false;
+      }
+    }, { capture: true, passive: false });
+
+    wrap.addEventListener('touchcancel', function () {
+      panning = false;
+    }, { capture: true, passive: true });
+  }
+
   function bumpZoom(delta) {
     var cur = loadZoom();
-    // Min 0.3 so users can actually get below the show_diameter=17
-    // clamp that fit_to applies on narrow viewports (needs scale ~70
-    // or lower on a ~400px-wide phone for cells to actually shrink).
-    var next = Math.max(0.3, Math.min(3.5, Math.round((cur + delta) * 100) / 100));
+    var next = Math.max(0.5, Math.min(4, Math.round((cur + delta) * 100) / 100));
     saveZoom(next);
     applyZoom(next);
   }
@@ -718,17 +718,6 @@
       dungeonInlineZoom: dungeon ? (dungeon.style.zoom || null) : null,
       dungeonComputedZoom: dungeon ? (getComputedStyle(dungeon).zoom || null) : null,
       dungeonParentId: dungeon && dungeon.parentNode ? (dungeon.parentNode.id || dungeon.parentNode.tagName) : null,
-      hasSetOption: typeof window.set_option === 'function',
-      displayModule: !!findDisplayModule(),
-      dungeonRendererModule: !!findDungeonRenderer(),
-      requireDefinedCount: (function () {
-        try {
-          var req = window.require || window.requirejs;
-          var defined = req && req.s && req.s.contexts && req.s.contexts._
-                        && req.s.contexts._.defined;
-          return defined ? Object.keys(defined).length : null;
-        } catch (_) { return null; }
-      })(),
     };
     // Walk #game's direct children so we can see who else is competing
     // for flex space. Lists the DOM order with id/tag/display/size/flex.

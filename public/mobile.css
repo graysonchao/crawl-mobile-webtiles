@@ -253,22 +253,36 @@ body.mwt-in-game #dungeon_block {
   position: relative !important;
 }
 
+/* The scroll wrapper we insert around #dungeon (see
+ * ensureDungeonWrapper in mobile.js). Native overflow: auto scrolling
+ * is hardware-accelerated on iOS without promoting the canvas to its
+ * own compositor layer (unlike CSS transform), so the WebKit bitmap-
+ * caching bug that caused vi-move sprite lag doesn't apply. */
+body.mwt-in-game #mwt-dungeon-wrap {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch;
+  /* Hint the browser that touch may scroll both axes (rather than
+   * triggering page scroll or pinch-zoom). */
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+  background: #000 !important;
+  position: relative;
+}
+
 body.mwt-in-game #dungeon {
-  /* Zoom is applied as inline px width/height by JS (see
-   * applyZoomToDungeon in mobile.js). We don't force any CSS width /
-   * height here because that would fight the inline px sizing.
-   * flex: 0 0 auto means "take the content size (= our inline px)"
-   * rather than participating in grow/shrink. align-self: center keeps
-   * the canvas horizontally centred in #normal when it's narrower than
-   * the viewport; if it's wider, overflow on #normal clips the sides. */
-  flex: 0 0 auto !important;
+  /* Inline px width/height are set by applyZoomToDungeon; CSS here
+   * just lets that through. margin: auto + overflow: auto parent
+   * centres the canvas at the initial scroll position, so the player
+   * (drawn at canvas centre) appears near the middle of the visible
+   * pan area until the user drags. */
   display: block !important;
-  align-self: center !important;
   max-width: none !important;
   max-height: none !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
+  margin: auto !important;
   image-rendering: pixelated !important;
   image-rendering: crisp-edges !important;
   background: #000 !important;
